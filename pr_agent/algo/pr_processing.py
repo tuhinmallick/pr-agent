@@ -230,9 +230,7 @@ async def retry_with_fallback_models(f: Callable):
             return await f(model)
         except Exception as e:
             get_logger().warning(
-                f"Failed to generate prediction with {model}"
-                f"{(' from deployment ' + deployment_id) if deployment_id else ''}: "
-                f"{traceback.format_exc()}"
+                f"Failed to generate prediction with {model}{f' from deployment {deployment_id}' if deployment_id else ''}: {traceback.format_exc()}"
             )
             if i == len(all_models) - 1:  # If it's the last iteration
                 raise  # Re-raise the last exception
@@ -243,8 +241,7 @@ def _get_all_models() -> List[str]:
     fallback_models = get_settings().config.fallback_models
     if not isinstance(fallback_models, list):
         fallback_models = [m.strip() for m in fallback_models.split(",")]
-    all_models = [model] + fallback_models
-    return all_models
+    return [model] + fallback_models
 
 
 def _get_all_deployments(all_models: List[str]) -> List[str]:

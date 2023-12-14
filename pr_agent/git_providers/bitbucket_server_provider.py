@@ -52,10 +52,7 @@ class BitbucketServerProvider(GitProvider):
             url = (f"{self.bitbucket_server_url}/projects/{self.workspace_slug}/repos/{self.repo_slug}/src/"
                    f"{self.pr.destination_branch}/.pr_agent.toml")
             response = requests.request("GET", url, headers=self.headers)
-            if response.status_code == 404:  # not found
-                return ""
-            contents = response.text.encode('utf-8')
-            return contents
+            return "" if response.status_code == 404 else response.text.encode('utf-8')
         except Exception:
             return ""
 
@@ -112,9 +109,7 @@ class BitbucketServerProvider(GitProvider):
             return False
 
     def is_supported(self, capability: str) -> bool:
-        if capability in ['get_issue_comments', 'get_labels', 'gfm_markdown']:
-            return False
-        return True
+        return capability not in {'get_issue_comments', 'get_labels', 'gfm_markdown'}
 
     def set_pr(self, pr_url: str):
         self.workspace_slug, self.repo_slug, self.pr_num = self._parse_pr_url(pr_url)
@@ -133,8 +128,7 @@ class BitbucketServerProvider(GitProvider):
 
     def get_files(self):
         changes = self.bitbucket_client.get_pull_requests_changes(self.workspace_slug, self.repo_slug, self.pr_num)
-        diffstat = [change["path"]['toString'] for change in changes]
-        return diffstat
+        return [change["path"]['toString'] for change in changes]
 
     def get_diff_files(self) -> list[FilePatchInfo]:
         if self.diff_files:
@@ -238,8 +232,9 @@ class BitbucketServerProvider(GitProvider):
             }
         }
 
-        response = requests.post(url=self._get_pr_comments_url(), json=payload, headers=self.headers)
-        return response
+        return requests.post(
+            url=self._get_pr_comments_url(), json=payload, headers=self.headers
+        )
 
     def generate_link_to_relevant_line_number(self, suggestion) -> str:
         try:
@@ -250,11 +245,10 @@ class BitbucketServerProvider(GitProvider):
 
             diff_files = self.get_diff_files()
             position, absolute_position = find_line_number_of_relevant_line_in_file \
-                (diff_files, relevant_file, relevant_line_str)
+                    (diff_files, relevant_file, relevant_line_str)
 
             if absolute_position != -1 and self.pr_url:
-                link = f"{self.pr_url}/#L{relevant_file}T{absolute_position}"
-                return link
+                return f"{self.pr_url}/#L{relevant_file}T{absolute_position}"
         except Exception as e:
             if get_settings().config.verbosity_level >= 2:
                 get_logger().info(f"Failed adding line link, error: {e}")
@@ -336,8 +330,11 @@ class BitbucketServerProvider(GitProvider):
             "title": pr_title
         })
 
-        response = requests.put(url=self.bitbucket_pull_request_api_url, headers=self.headers, data=payload)
-        return response
+        return requests.put(
+            url=self.bitbucket_pull_request_api_url,
+            headers=self.headers,
+            data=payload,
+        )
 
     # bitbucket does not support labels
     def publish_labels(self, pr_types: list):

@@ -69,6 +69,7 @@ class PRInformationFromUser:
         model_output = self.prediction.strip()
         if get_settings().config.verbosity_level >= 2:
             get_logger().info(f"answer_str:\n{model_output}")
-        answer_str = f"{model_output}\n\n Please respond to the questions above in the following format:\n\n" +\
-                     "\n>/answer\n>1) ...\n>2) ...\n>...\n"
-        return answer_str
+        return (
+            f"{model_output}\n\n Please respond to the questions above in the following format:\n\n"
+            + "\n>/answer\n>1) ...\n>2) ...\n>...\n"
+        )

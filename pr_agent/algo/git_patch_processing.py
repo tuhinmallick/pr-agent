@@ -35,8 +35,7 @@ def extend_patch(original_file_str, patch_str, num_lines) -> str:
     try:
         for line in patch_lines:
             if line.startswith('@@'):
-                match = RE_HUNK_HEADER.match(line)
-                if match:
+                if match := RE_HUNK_HEADER.match(line):
                     # finish previous hunk
                     if start1 != -1:
                         extended_patch_lines.extend(
@@ -73,8 +72,7 @@ def extend_patch(original_file_str, patch_str, num_lines) -> str:
         extended_patch_lines.extend(
             original_lines[start1 + size1 - 1:start1 + size1 - 1 + num_lines])
 
-    extended_patch_str = '\n'.join(extended_patch_lines)
-    return extended_patch_str
+    return '\n'.join(extended_patch_lines)
 
 
 def omit_deletion_hunks(patch_lines) -> str:
@@ -95,8 +93,7 @@ def omit_deletion_hunks(patch_lines) -> str:
 
     for line in patch_lines:
         if line.startswith('@@'):
-            match = RE_HUNK_HEADER.match(line)
-            if match:
+            if match := RE_HUNK_HEADER.match(line):
                 # finish previous hunk
                 if inside_hunk and add_hunk:
                     added_patched.extend(temp_hunk)
@@ -199,12 +196,11 @@ __old hunk__
             header_line = line
             match = RE_HUNK_HEADER.match(line)
             if match and new_content_lines:  # found a new hunk, split the previous lines
-                if new_content_lines:
-                    if prev_header_line:
-                        patch_with_lines_str += f'\n{prev_header_line}\n'
-                    patch_with_lines_str += '__new hunk__\n'
-                    for i, line_new in enumerate(new_content_lines):
-                        patch_with_lines_str += f"{start2 + i} {line_new}\n"
+                if prev_header_line:
+                    patch_with_lines_str += f'\n{prev_header_line}\n'
+                patch_with_lines_str += '__new hunk__\n'
+                for i, line_new in enumerate(new_content_lines):
+                    patch_with_lines_str += f"{start2 + i} {line_new}\n"
                 if old_content_lines:
                     patch_with_lines_str += '__old hunk__\n'
                     for line_old in old_content_lines:
@@ -234,11 +230,10 @@ __old hunk__
 
     # finishing last hunk
     if match and new_content_lines:
-        if new_content_lines:
-            patch_with_lines_str += f'\n{header_line}\n'
-            patch_with_lines_str += '\n__new hunk__\n'
-            for i, line_new in enumerate(new_content_lines):
-                patch_with_lines_str += f"{start2 + i} {line_new}\n"
+        patch_with_lines_str += f'\n{header_line}\n'
+        patch_with_lines_str += '\n__new hunk__\n'
+        for i, line_new in enumerate(new_content_lines):
+            patch_with_lines_str += f"{start2 + i} {line_new}\n"
         if old_content_lines:
             patch_with_lines_str += '\n__old hunk__\n'
             for line_old in old_content_lines:

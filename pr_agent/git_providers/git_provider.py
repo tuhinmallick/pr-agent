@@ -182,7 +182,9 @@ def get_main_pr_language(languages, files) -> str:
             extension_list.append(file.filename.rsplit('.')[-1])
 
         # get the most common extension
-        most_common_extension = '.' + max(set(extension_list), key=extension_list.count)
+        most_common_extension = (
+            f'.{max(set(extension_list), key=extension_list.count)}'
+        )
         try:
             language_extension_map_org = get_settings().language_extension_map_org
             language_extension_map = {k.lower(): v for k, v in language_extension_map_org.items()}
@@ -196,33 +198,29 @@ def get_main_pr_language(languages, files) -> str:
                         break
         except Exception as e:
             get_logger().exception(f"Failed to get main language: {e}")
-            pass
-
-        ## old approach:
-        # most_common_extension = max(set(extension_list), key=extension_list.count)
-        # if most_common_extension == 'py' and top_language == 'python' or \
-        #         most_common_extension == 'js' and top_language == 'javascript' or \
-        #         most_common_extension == 'ts' and top_language == 'typescript' or \
-        #         most_common_extension == 'tsx' and top_language == 'typescript' or \
-        #         most_common_extension == 'go' and top_language == 'go' or \
-        #         most_common_extension == 'java' and top_language == 'java' or \
-        #         most_common_extension == 'c' and top_language == 'c' or \
-        #         most_common_extension == 'cpp' and top_language == 'c++' or \
-        #         most_common_extension == 'cs' and top_language == 'c#' or \
-        #         most_common_extension == 'swift' and top_language == 'swift' or \
-        #         most_common_extension == 'php' and top_language == 'php' or \
-        #         most_common_extension == 'rb' and top_language == 'ruby' or \
-        #         most_common_extension == 'rs' and top_language == 'rust' or \
-        #         most_common_extension == 'scala' and top_language == 'scala' or \
-        #         most_common_extension == 'kt' and top_language == 'kotlin' or \
-        #         most_common_extension == 'pl' and top_language == 'perl' or \
-        #         most_common_extension == top_language:
-        #     main_language_str = top_language
+            ## old approach:
+            # most_common_extension = max(set(extension_list), key=extension_list.count)
+            # if most_common_extension == 'py' and top_language == 'python' or \
+            #         most_common_extension == 'js' and top_language == 'javascript' or \
+            #         most_common_extension == 'ts' and top_language == 'typescript' or \
+            #         most_common_extension == 'tsx' and top_language == 'typescript' or \
+            #         most_common_extension == 'go' and top_language == 'go' or \
+            #         most_common_extension == 'java' and top_language == 'java' or \
+            #         most_common_extension == 'c' and top_language == 'c' or \
+            #         most_common_extension == 'cpp' and top_language == 'c++' or \
+            #         most_common_extension == 'cs' and top_language == 'c#' or \
+            #         most_common_extension == 'swift' and top_language == 'swift' or \
+            #         most_common_extension == 'php' and top_language == 'php' or \
+            #         most_common_extension == 'rb' and top_language == 'ruby' or \
+            #         most_common_extension == 'rs' and top_language == 'rust' or \
+            #         most_common_extension == 'scala' and top_language == 'scala' or \
+            #         most_common_extension == 'kt' and top_language == 'kotlin' or \
+            #         most_common_extension == 'pl' and top_language == 'perl' or \
+            #         most_common_extension == top_language:
+            #     main_language_str = top_language
 
     except Exception as e:
         get_logger().exception(e)
-        pass
-
     return main_language_str
 
 

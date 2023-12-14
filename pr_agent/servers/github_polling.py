@@ -94,7 +94,7 @@ async def polling_loop():
                                             commenter_github_user = comment['user']['login'] \
                                                 if 'user' in comment else ''
                                             get_logger().info(f"Commenter: {commenter_github_user}\nComment: {comment_body}")
-                                            user_tag = "@" + user_id
+                                            user_tag = f"@{user_id}"
                                             if user_tag not in comment_body:
                                                 continue
                                             rest_of_comment = comment_body.split(user_tag)[1].strip()

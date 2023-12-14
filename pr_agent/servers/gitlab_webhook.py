@@ -46,7 +46,7 @@ async def gitlab_webhook(background_tasks: BackgroundTasks, request: Request):
             return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content=jsonable_encoder({"message": "unauthorized"}))
     elif get_settings().get("GITLAB.SHARED_SECRET"):
         secret = get_settings().get("GITLAB.SHARED_SECRET")
-        if not request.headers.get("X-Gitlab-Token") == secret:
+        if request.headers.get("X-Gitlab-Token") != secret:
             return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content=jsonable_encoder({"message": "unauthorized"}))
     else:
         return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content=jsonable_encoder({"message": "unauthorized"}))

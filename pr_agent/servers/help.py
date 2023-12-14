@@ -12,7 +12,7 @@ commands_text = "> **/review**: Request a review of your Pull Request.   \n" \
 
 
 def bot_help_text(user: str):
-    return f"> Tag me in a comment '@{user}' and add one of the following commands:  \n" + commands_text
+    return f"> Tag me in a comment '@{user}' and add one of the following commands:  \n{commands_text}"
 
 
 actions_help_text = "> To invoke the PR-Agent, add a comment using one of the following commands:  \n" + \
