@@ -102,11 +102,10 @@ class AiHandler:
             deployment_id = self.deployment_id
             if get_settings().config.verbosity_level >= 2:
                 get_logger().debug(
-                    f"Generating completion with {model}"
-                    f"{(' from deployment ' + deployment_id) if deployment_id else ''}"
+                    f"Generating completion with {model}{f' from deployment {deployment_id}' if deployment_id else ''}"
                 )
             if self.azure:
-                model = 'azure/' + model
+                model = f'azure/{model}'
             messages = [{"role": "system", "content": system}, {"role": "user", "content": user}]
             kwargs = {
                 "model": model,

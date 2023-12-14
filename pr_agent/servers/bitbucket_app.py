@@ -50,8 +50,7 @@ async def get_bearer_token(shared_secret: str, client_key: str):
             'Content-Type': 'application/x-www-form-urlencoded'
         }
         response = requests.request("POST", url, headers=headers, data=payload)
-        bearer_token = response.json()["access_token"]
-        return bearer_token
+        return response.json()["access_token"]
     except Exception as e:
         get_logger().error(f"Failed to get bearer token: {e}")
         raise e

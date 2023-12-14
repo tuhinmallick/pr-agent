@@ -102,7 +102,7 @@ class PRDescription:
             if get_settings().config.publish_output:
                 get_logger().info(f"Pushing answer {self.pr_id}")
                 if get_settings().pr_description.publish_description_as_comment:
-                    get_logger().info(f"Publishing answer as comment")
+                    get_logger().info("Publishing answer as comment")
                     self.git_provider.publish_comment(full_markdown_description)
                 else:
                     self.git_provider.publish_description(pr_title, pr_body)
@@ -113,14 +113,15 @@ class PRDescription:
 
                     if (get_settings().pr_description.final_update_message and
                             hasattr(self.git_provider, 'pr_url') and self.git_provider.pr_url):
-                        latest_commit_url = self.git_provider.get_latest_commit_url()
-                        if latest_commit_url:
+                        if (
+                            latest_commit_url := self.git_provider.get_latest_commit_url()
+                        ):
                             self.git_provider.publish_comment(
                                 f"**[PR Description]({self.git_provider.pr_url})** updated to latest commit ({latest_commit_url})")
                 self.git_provider.remove_initial_comment()
         except Exception as e:
             get_logger().error(f"Error generating PR description {self.pr_id}: {e}")
-        
+
         return ""
 
     async def _prepare_prediction(self, model: str) -> None:
@@ -223,8 +224,7 @@ class PRDescription:
             body = body.replace('pr_agent:summary', summary)
 
         if not re.search(r'<!--\s*pr_agent:walkthrough\s*-->', body):
-            ai_walkthrough = self.data.get('PR Main Files Walkthrough')
-            if ai_walkthrough:
+            if ai_walkthrough := self.data.get('PR Main Files Walkthrough'):
                 walkthrough = str(ai_header)
                 for file in ai_walkthrough:
                     filename = file['filename'].replace("'", "`")
@@ -288,7 +288,7 @@ class PRDescription:
             else:
                 # if the value is a list, join its items by comma
                 if isinstance(value, list):
-                    value = ', '.join(v for v in value)
+                    value = ', '.join(value)
                 pr_body += f"{value}\n"
             if idx < len(self.data) - 1:
                 pr_body += "\n\n___\n\n"
@@ -310,7 +310,6 @@ class PRDescription:
                 self.file_label_dict[label].append((filename, changes_summary))
             except Exception as e:
                 get_logger().error(f"Error preparing file label dict {self.pr_id}: {e}")
-                pass
 
     def process_pr_files_prediction(self, pr_body, value):
         if not self.git_provider.is_supported("gfm_markdown"):
@@ -318,7 +317,7 @@ class PRDescription:
             return pr_body
         try:
             pr_body += "<table>"
-            header = f"Relevant files"
+            header = "Relevant files"
             delta = 65
             header += "&nbsp; " * delta
             pr_body += f"""<thead><tr><th></th><th>{header}</th></tr></thead>"""
@@ -370,7 +369,6 @@ class PRDescription:
 
         except Exception as e:
             get_logger().error(f"Error processing pr files to markdown {self.pr_id}: {e}")
-            pass
         return pr_body
 
     def _insert_br_after_x_chars(self, text, x=70):
@@ -391,7 +389,7 @@ class PRDescription:
                 current_length = 0  # Reset counter
 
             # Add the word to the new text
-            new_text += word + " "
+            new_text += f"{word} "
             current_length += len(word) + 1  # Add 1 for the space
 
         return new_text.strip()  # Remove trailing space

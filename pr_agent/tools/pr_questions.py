@@ -37,11 +37,7 @@ class PRQuestions:
         self.prediction = None
 
     def parse_args(self, args):
-        if args and len(args) > 0:
-            question_str = " ".join(args)
-        else:
-            question_str = ""
-        return question_str
+        return " ".join(args) if args and len(args) > 0 else ""
 
     async def run(self):
         get_logger().info('Answering a PR question...')

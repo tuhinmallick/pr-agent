@@ -46,10 +46,7 @@ class BitbucketProvider(GitProvider):
             url = (f"https://api.bitbucket.org/2.0/repositories/{self.workspace_slug}/{self.repo_slug}/src/"
                    f"{self.pr.destination_branch}/.pr_agent.toml")
             response = requests.request("GET", url, headers=self.headers)
-            if response.status_code == 404:  # not found
-                return ""
-            contents = response.text.encode('utf-8')
-            return contents
+            return "" if response.status_code == 404 else response.text.encode('utf-8')
         except Exception:
             return ""
 
@@ -106,9 +103,12 @@ class BitbucketProvider(GitProvider):
             return False
 
     def is_supported(self, capability: str) -> bool:
-        if capability in ['get_issue_comments', 'publish_inline_comments', 'get_labels', 'gfm_markdown']:
-            return False
-        return True
+        return capability not in {
+            'get_issue_comments',
+            'publish_inline_comments',
+            'get_labels',
+            'gfm_markdown',
+        }
 
     def set_pr(self, pr_url: str):
         self.workspace_slug, self.repo_slug, self.pr_num = self._parse_pr_url(pr_url)
@@ -123,7 +123,9 @@ class BitbucketProvider(GitProvider):
 
         diffs = self.pr.diffstat()
         diff_split = [
-            "diff --git%s" % x for x in self.pr.diff().split("diff --git") if x.strip()
+            f"diff --git{x}"
+            for x in self.pr.diff().split("diff --git")
+            if x.strip()
         ]
 
         diff_files = []
@@ -179,12 +181,11 @@ class BitbucketProvider(GitProvider):
                     return
         except Exception as e:
             get_logger().exception(f"Failed to update persistent review, error: {e}")
-            pass
         self.publish_comment(pr_comment)
 
     def publish_comment(self, pr_comment: str, is_temporary: bool = False):
-        comment = self.pr.comment(pr_comment)
         if is_temporary:
+            comment = self.pr.comment(pr_comment)
             self.temp_comments.append(comment["id"])
 
     def remove_initial_comment(self):
@@ -223,17 +224,19 @@ class BitbucketProvider(GitProvider):
                 "path": file
             },
         })
-        response = requests.request(
-            "POST", self.bitbucket_comment_api_url, data=payload, headers=self.headers
+        return requests.request(
+            "POST",
+            self.bitbucket_comment_api_url,
+            data=payload,
+            headers=self.headers,
         )
-        return response
 
     def get_line_link(self, relevant_file: str, relevant_line_start: int, relevant_line_end: int = None) -> str:
-        if relevant_line_start == -1:
-            link = f"{self.pr_url}/#L{relevant_file}"
-        else:
-            link = f"{self.pr_url}/#L{relevant_file}T{relevant_line_start}"
-        return link
+        return (
+            f"{self.pr_url}/#L{relevant_file}"
+            if relevant_line_start == -1
+            else f"{self.pr_url}/#L{relevant_file}T{relevant_line_start}"
+        )
 
     def generate_link_to_relevant_line_number(self, suggestion) -> str:
         try:
@@ -244,11 +247,10 @@ class BitbucketProvider(GitProvider):
 
             diff_files = self.get_diff_files()
             position, absolute_position = find_line_number_of_relevant_line_in_file \
-                (diff_files, relevant_file, relevant_line_str)
+                    (diff_files, relevant_file, relevant_line_str)
 
             if absolute_position != -1 and self.pr_url:
-                link = f"{self.pr_url}/#L{relevant_file}T{absolute_position}"
-                return link
+                return f"{self.pr_url}/#L{relevant_file}T{absolute_position}"
         except Exception as e:
             if get_settings().config.verbosity_level >= 2:
                 get_logger().info(f"Failed adding line link, error: {e}")
@@ -271,8 +273,7 @@ class BitbucketProvider(GitProvider):
         return self.pr.title
 
     def get_languages(self):
-        languages = {self._get_repo().get_data("language"): 0}
-        return languages
+        return {self._get_repo().get_data("language"): 0}
 
     def get_pr_branch(self):
         return self.pr.source_branch

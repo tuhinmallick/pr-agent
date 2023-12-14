@@ -52,17 +52,16 @@ class GithubProvider(GitProvider):
         self.commits = list(self.pr.get_commits())
 
         self.previous_review = self.get_previous_review(full=True, incremental=True)
-        if self.previous_review:
-            self.incremental.commits_range = self.get_commit_range()
-            # Get all files changed during the commit range
-            self.file_set = dict()
-            for commit in self.incremental.commits_range:
-                if commit.commit.message.startswith(f"Merge branch '{self._get_repo().default_branch}'"):
-                    get_logger().info(f"Skipping merge commit {commit.commit.message}")
-                    continue
-                self.file_set.update({file.filename: file for file in commit.files})
-        else:
+        if not self.previous_review:
             raise ValueError("No previous review found")
+        self.incremental.commits_range = self.get_commit_range()
+        # Get all files changed during the commit range
+        self.file_set = dict()
+        for commit in self.incremental.commits_range:
+            if commit.commit.message.startswith(f"Merge branch '{self._get_repo().default_branch}'"):
+                get_logger().info(f"Skipping merge commit {commit.commit.message}")
+                continue
+            self.file_set.update({file.filename: file for file in commit.files})
 
     def get_commit_range(self):
         last_review_time = self.previous_review.created_at
@@ -287,8 +286,7 @@ class GithubProvider(GitProvider):
         return self.pr.title
 
     def get_languages(self):
-        languages = self._get_repo().get_languages()
-        return languages
+        return self._get_repo().get_languages()
 
     def get_pr_branch(self):
         return self.pr.head.ref
@@ -311,19 +309,14 @@ class GithubProvider(GitProvider):
         if deployment_type != 'user':
             raise ValueError("Deployment mode must be set to 'user' to get notifications")
 
-        notifications = self.github_client.get_user().get_notifications(since=since)
-        return notifications
+        return self.github_client.get_user().get_notifications(since=since)
 
     def get_issue_comments(self):
         return self.pr.get_issue_comments()
 
     def get_repo_settings(self):
         try:
-            # contents = self.repo_obj.get_contents(".pr_agent.toml", ref=self.pr.head.sha).decoded_content
-
-            # more logical to take 'pr_agent.toml' from the default branch
-            contents = self.repo_obj.get_contents(".pr_agent.toml").decoded_content
-            return contents
+            return self.repo_obj.get_contents(".pr_agent.toml").decoded_content
         except Exception:
             return ""
 
@@ -427,13 +420,13 @@ class GithubProvider(GitProvider):
             return Github(auth=Auth.Token(token), base_url=get_settings().github.base_url)
 
     def _get_repo(self):
-        if hasattr(self, 'repo_obj') and \
-                hasattr(self.repo_obj, 'full_name') and \
-                self.repo_obj.full_name == self.repo:
-            return self.repo_obj
-        else:
+        if (
+            not hasattr(self, 'repo_obj')
+            or not hasattr(self.repo_obj, 'full_name')
+            or self.repo_obj.full_name != self.repo
+        ):
             self.repo_obj = self.github_client.get_repo(self.repo)
-            return self.repo_obj
+        return self.repo_obj
 
 
     def _get_pr(self):
@@ -470,7 +463,7 @@ class GithubProvider(GitProvider):
 
     def get_repo_labels(self):
         labels = self.repo_obj.get_labels()
-        return [label for label in labels]
+        return list(labels)
 
     def get_commit_messages(self):
         """
@@ -498,7 +491,7 @@ class GithubProvider(GitProvider):
                 return ""
 
             position, absolute_position = find_line_number_of_relevant_line_in_file \
-                (self.diff_files, relevant_file, relevant_line_str)
+                    (self.diff_files, relevant_file, relevant_line_str)
 
             if absolute_position != -1:
                 # # link to right file only
@@ -507,8 +500,7 @@ class GithubProvider(GitProvider):
 
                 # link to diff
                 sha_file = hashlib.sha256(relevant_file.encode('utf-8')).hexdigest()
-                link = f"https://github.com/{self.repo}/pull/{self.pr_num}/files#diff-{sha_file}R{absolute_position}"
-                return link
+                return f"https://github.com/{self.repo}/pull/{self.pr_num}/files#diff-{sha_file}R{absolute_position}"
         except Exception as e:
             if get_settings().config.verbosity_level >= 2:
                 get_logger().info(f"Failed adding line link, error: {e}")
@@ -518,17 +510,15 @@ class GithubProvider(GitProvider):
     def get_line_link(self, relevant_file: str, relevant_line_start: int, relevant_line_end: int = None) -> str:
         sha_file = hashlib.sha256(relevant_file.encode('utf-8')).hexdigest()
         if relevant_line_start == -1:
-            link = f"https://github.com/{self.repo}/pull/{self.pr_num}/files#diff-{sha_file}"
+            return f"https://github.com/{self.repo}/pull/{self.pr_num}/files#diff-{sha_file}"
         elif relevant_line_end:
-            link = f"https://github.com/{self.repo}/pull/{self.pr_num}/files#diff-{sha_file}R{relevant_line_start}-R{relevant_line_end}"
+            return f"https://github.com/{self.repo}/pull/{self.pr_num}/files#diff-{sha_file}R{relevant_line_start}-R{relevant_line_end}"
         else:
-            link = f"https://github.com/{self.repo}/pull/{self.pr_num}/files#diff-{sha_file}R{relevant_line_start}"
-        return link
+            return f"https://github.com/{self.repo}/pull/{self.pr_num}/files#diff-{sha_file}R{relevant_line_start}"
 
 
     def get_pr_id(self):
         try:
-            pr_id = f"{self.repo}/{self.pr_num}"
-            return pr_id
+            return f"{self.repo}/{self.pr_num}"
         except:
             return ""

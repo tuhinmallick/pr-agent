@@ -70,10 +70,7 @@ def convert_to_markdown(output_data: dict, gfm_supported: bool=True) -> str:
                 elif item:
                     markdown_text += f"  - {item}\n"
             if key.lower() == 'code feedback':
-                if gfm_supported:
-                    markdown_text += "</details>\n\n"
-                else:
-                    markdown_text += "\n\n"
+                markdown_text += "</details>\n\n" if gfm_supported else "\n\n"
         elif value != 'n/a':
             emoji = emojis.get(key, "")
             markdown_text += f"- {emoji} **{key}:** {value}\n"
@@ -104,7 +101,7 @@ def parse_code_suggestion(code_suggestions: dict, i: int = 0, gfm_supported: boo
                 elif sub_key.lower() == 'suggestion':
                     markdown_text += f"<tr><td>{sub_key} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td><td><strong>{sub_value}</strong></td></tr>"
                 elif sub_key.lower() == 'relevant line':
-                    markdown_text += f"<tr><td>relevant line</td>"
+                    markdown_text += "<tr><td>relevant line</td>"
                     sub_value_list = sub_value.split('](')
                     relevant_line = sub_value_list[0].lstrip('`').lstrip('[')
                     if len(sub_value_list) > 1:
@@ -115,7 +112,6 @@ def parse_code_suggestion(code_suggestions: dict, i: int = 0, gfm_supported: boo
                     markdown_text += "</tr>"
             except Exception as e:
                 get_logger().exception(f"Failed to parse code suggestion: {e}")
-                pass
         markdown_text += '</table>'
         markdown_text += "<hr>"
     else:
@@ -170,11 +166,7 @@ def try_fix_json(review, max_iter=10, code_suggestions=False):
         return fix_json_escape_char(review)
 
     data = {}
-    if code_suggestions:
-        closing_bracket = "]}"
-    else:
-        closing_bracket = "]}}"
-
+    closing_bracket = "]}" if code_suggestions else "]}}"
     if (review.rfind("'Code feedback': [") > 0 or review.rfind('"Code feedback": [') > 0) or \
             (review.rfind("'Code suggestions': [") > 0 or review.rfind('"Code suggestions": [') > 0) :
         last_code_suggestion_ind = [m.end() for m in re.finditer(r"\}\s*,", review)][-1] - 1
@@ -333,7 +325,10 @@ def try_fix_yaml(response_text: str) -> dict:
     response_text_lines_copy = response_text_lines.copy()
     for i in range(0, len(response_text_lines_copy)):
         for key in keys:
-            if key in response_text_lines_copy[i] and not '|-' in response_text_lines_copy[i]:
+            if (
+                key in response_text_lines_copy[i]
+                and '|-' not in response_text_lines_copy[i]
+            ):
                 response_text_lines_copy[i] = response_text_lines_copy[i].replace(f'{key}',
                                                                                   f'{key} |-\n        ')
     try:
@@ -353,12 +348,14 @@ def try_fix_yaml(response_text: str) -> dict:
             break
         except:
             pass
-    
+
     # thrid fallback - try to remove leading and trailing curly brackets
     response_text_copy = response_text.strip().rstrip().removeprefix('{').removesuffix('}')
     try:
         data = yaml.safe_load(response_text_copy,)
-        get_logger().info(f"Successfully parsed AI prediction after removing curly brackets")
+        get_logger().info(
+            "Successfully parsed AI prediction after removing curly brackets"
+        )
         return data
     except:
         pass

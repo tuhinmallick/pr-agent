@@ -89,13 +89,13 @@ class PRGenerateLabels:
                 if self.git_provider.is_supported("get_labels"):
                     self.git_provider.publish_labels(pr_labels)
                 elif pr_labels:
-                    value = ', '.join(v for v in pr_labels)
+                    value = ', '.join(pr_labels)
                     pr_labels_text = f"## PR Labels:\n{value}\n"
                     self.git_provider.publish_comment(pr_labels_text, is_temporary=False)
                 self.git_provider.remove_initial_comment()
         except Exception as e:
             get_logger().error(f"Error generating PR labels {self.pr_id}: {e}")
-        
+
         return ""
 
     async def _prepare_prediction(self, model: str) -> None:

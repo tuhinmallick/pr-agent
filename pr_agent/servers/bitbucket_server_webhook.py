@@ -27,7 +27,6 @@ def handle_request(background_tasks: BackgroundTasks, url: str, body: str, log_c
 
 @router.post("/webhook")
 async def handle_webhook(background_tasks: BackgroundTasks, request: Request):
-    log_context = {"server_type": "bitbucket_server"}
     data = await request.json()
     get_logger().info(json.dumps(data))
 
@@ -37,9 +36,11 @@ async def handle_webhook(background_tasks: BackgroundTasks, request: Request):
     bitbucket_server = get_settings().get("BITBUCKET_SERVER.URL")
     pr_url = f"{bitbucket_server}/projects/{project_name}/repos/{repository_name}/pull-requests/{pr_id}"
 
-    log_context["api_url"] = pr_url
-    log_context["event"] = "pull_request"
-
+    log_context = {
+        "server_type": "bitbucket_server",
+        "api_url": pr_url,
+        "event": "pull_request",
+    }
     handle_request(background_tasks, pr_url, "review", log_context)
     return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder({"message": "success"}))
 

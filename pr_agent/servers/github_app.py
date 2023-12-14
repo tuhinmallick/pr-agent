@@ -55,8 +55,9 @@ async def get_body(request):
     except Exception as e:
         get_logger().error("Error parsing request body", e)
         raise HTTPException(status_code=400, detail="Error parsing request body") from e
-    webhook_secret = getattr(get_settings().github, 'webhook_secret', None)
-    if webhook_secret:
+    if webhook_secret := getattr(
+        get_settings().github, 'webhook_secret', None
+    ):
         body_bytes = await request.body()
         signature_header = request.headers.get('x-hub-signature-256', None)
         verify_signature(body_bytes, webhook_secret, signature_header)
@@ -110,9 +111,6 @@ async def handle_request(body: Dict[str, Any], event: str):
         with get_logger().contextualize(**log_context):
             await agent.handle_request(api_url, comment_body, notify=lambda: provider.add_eyes_reaction(comment_id))
 
-    # handle pull_request event:
-    #   automatically review opened/reopened/ready_for_review PRs as long as they're not in draft,
-    #   as well as direct review requests from the bot
     elif event == 'pull_request' and action != 'synchronize':
         pull_request, api_url = _check_pull_request_event(action, body, log_context, bot_user)
         if not (pull_request and api_url):
@@ -124,8 +122,7 @@ async def handle_request(body: Dict[str, Any], event: str):
             get_logger().info(f"Performing review for {api_url=} because of {event=} and {action=}")
             await _perform_commands("pr_commands", agent, body, api_url, log_context)
 
-    # handle pull_request event with synchronize action - "push trigger" for new commits
-    elif event == 'pull_request' and action == 'synchronize':
+    elif event == 'pull_request':
         pull_request, api_url = _check_pull_request_event(action, body, log_context, bot_user)
         if not (pull_request and api_url):
             return {}
@@ -201,7 +198,9 @@ def _check_pull_request_event(action: str, body: dict, log_context: dict, bot_us
     log_context["api_url"] = api_url
     if pull_request.get("draft", True) or pull_request.get("state") != "open" or pull_request.get("user", {}).get("login", "") == bot_user:
         return invalid_result
-    if action in ("review_requested", "synchronize") and pull_request.get("created_at") == pull_request.get("updated_at"):
+    if action in {"review_requested", "synchronize"} and pull_request.get(
+        "created_at"
+    ) == pull_request.get("updated_at"):
         # avoid double reviews when opening a PR for the first time
         return invalid_result
     return pull_request, api_url

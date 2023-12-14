@@ -168,7 +168,7 @@ def upload_patch(patch, path):
     )
     response.raise_for_status()
     patch_server_endpoint = patch_server_endpoint.rstrip("/")
-    return patch_server_endpoint + "/" + path
+    return f"{patch_server_endpoint}/{path}"
 
 
 class GerritProvider(GitProvider):
@@ -277,9 +277,7 @@ class GerritProvider(GitProvider):
             self.repo.head.commit.parents[0],  # previous commit
             R=True
         )
-        # Get the list of changed files
-        diff_files = [item.a_path for item in diff_index]
-        return diff_files
+        return [item.a_path for item in diff_index]
 
     def get_languages(self):
         """
@@ -295,9 +293,9 @@ class GerritProvider(GitProvider):
             [filepath.suffix.lower()])
         # Convert counts to percentages
         total_files = len(filepaths)
-        lang_percentage = {lang: count / total_files * 100 for lang, count
-                           in lang_count.items()}
-        return lang_percentage
+        return {
+            lang: count / total_files * 100 for lang, count in lang_count.items()
+        }
 
     def get_pr_description_full(self):
         return self.repo.head.commit.message
@@ -306,15 +304,12 @@ class GerritProvider(GitProvider):
         return self.repo.head.commit.author.email
 
     def is_supported(self, capability: str) -> bool:
-        if capability in [
-            # 'get_issue_comments',
+        return capability not in {
             'create_inline_comment',
             'publish_inline_comments',
             'get_labels',
-            'gfm_markdown'
-        ]:
-            return False
-        return True
+            'gfm_markdown',
+        }
 
     def split_suggestion(self, msg) -> tuple[str, str]:
         is_code_context = False
@@ -350,7 +345,7 @@ class GerritProvider(GitProvider):
                 suggestion["relevant_lines_end"],
             )
             patch = diff(cwd=self.repo_path)
-            patch_id = uuid.uuid4().hex[0:4]
+            patch_id = uuid.uuid4().hex[:4]
             path = "/".join(["codium-ai", self.refspec, patch_id])
             full_path = upload_patch(patch, path)
             reset_local_changes(self.repo_path)

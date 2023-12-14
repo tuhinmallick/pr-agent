@@ -57,17 +57,16 @@ class PRSimilarIssue:
 
         upsert = True
         pinecone.init(api_key=api_key, environment=environment)
-        if not index_name in pinecone.list_indexes():
+        if index_name not in pinecone.list_indexes():
             run_from_scratch = True
             upsert = False
+        elif get_settings().pr_similar_issue.force_update_dataset:
+            upsert = True
         else:
-            if get_settings().pr_similar_issue.force_update_dataset:
-                upsert = True
-            else:
-                pinecone_index = pinecone.Index(index_name=index_name)
-                res = pinecone_index.fetch([f"example_issue_{repo_name_for_index}"]).to_dict()
-                if res["vectors"]:
-                    upsert = False
+            pinecone_index = pinecone.Index(index_name=index_name)
+            res = pinecone_index.fetch([f"example_issue_{repo_name_for_index}"]).to_dict()
+            if res["vectors"]:
+                upsert = False
 
         if run_from_scratch or upsert:  # index the entire repo
             get_logger().info('Indexing the entire repo...')
@@ -78,8 +77,8 @@ class PRSimilarIssue:
             self._update_index_with_issues(issues, repo_name_for_index, upsert=upsert)
         else:  # update index if needed
             pinecone_index = pinecone.Index(index_name=index_name)
-            issues_to_update = []
             issues_paginated_list = repo_obj.get_issues(state='all')
+            issues_to_update = []
             counter = 1
             for issue in issues_paginated_list:
                 if issue.pull_request:
@@ -88,17 +87,15 @@ class PRSimilarIssue:
                 issue_key = f"issue_{number}"
                 id = issue_key + "." + "issue"
                 res = pinecone_index.fetch([id]).to_dict()
-                is_new_issue = True
-                for vector in res["vectors"].values():
-                    if vector['metadata']['repo'] == repo_name_for_index:
-                        is_new_issue = False
-                        break
-                if is_new_issue:
-                    counter += 1
-                    issues_to_update.append(issue)
-                else:
+                is_new_issue = all(
+                    vector['metadata']['repo'] != repo_name_for_index
+                    for vector in res["vectors"].values()
+                )
+                if not is_new_issue:
                     break
 
+                counter += 1
+                issues_to_update.append(issue)
             if issues_to_update:
                 get_logger().info(f'Updating index with {counter} new issues...')
                 self._update_index_with_issues(issues_to_update, repo_name_for_index, upsert=True)
@@ -143,7 +140,7 @@ class PRSimilarIssue:
                 relevant_comment_number_list.append(int(r["id"].split('.')[1].split('_')[-1]))
             else:
                 relevant_comment_number_list.append(-1)
-            score_list.append(str("{:.2f}".format(r['score'])))
+            score_list.append("{:.2f}".format(r['score']))
         get_logger().info('Done')
 
         get_logger().info('Publishing response...')
@@ -198,7 +195,7 @@ class PRSimilarIssue:
             username = issue.user.login
             created_at = str(issue.created_at)
             if len(issue_str) < 8000 or \
-                    self.token_handler.count_tokens(issue_str) < get_max_tokens(MODEL):  # fast reject first
+                        self.token_handler.count_tokens(issue_str) < get_max_tokens(MODEL):  # fast reject first
                 issue_record = Record(
                     id=issue_key + "." + "issue",
                     text=issue_str,
@@ -216,7 +213,7 @@ class PRSimilarIssue:
                             continue
 
                         if len(comment_body) < 8000 or \
-                                self.token_handler.count_tokens(comment_body) < MAX_TOKENS[MODEL]:
+                                    self.token_handler.count_tokens(comment_body) < MAX_TOKENS[MODEL]:
                             comment_record = Record(
                                 id=issue_key + ".comment_" + str(j + 1),
                                 text=comment_body,
@@ -238,7 +235,7 @@ class PRSimilarIssue:
         except:
             embeds = []
             get_logger().error('Failed to embed entire list, embedding one by one...')
-            for i, text in enumerate(list_to_encode):
+            for text in list_to_encode:
                 try:
                     res = openai.Embedding.create(input=[text], engine=MODEL)
                     embeds.append(res['data'][0]['embedding'])

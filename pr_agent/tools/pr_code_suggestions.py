@@ -23,7 +23,7 @@ class PRCodeSuggestions:
 
         # extended mode
         try:
-            self.is_extended = any(["extended" in arg for arg in args])
+            self.is_extended = any("extended" in arg for arg in args)
         except:
             self.is_extended = False
         if self.is_extended:
@@ -62,12 +62,12 @@ class PRCodeSuggestions:
                 data = self._prepare_pr_code_suggestions()
             else:
                 data = await retry_with_fallback_models(self._prepare_prediction_extended)
-            if (not data) or (not 'Code suggestions' in data):
+            if not data or 'Code suggestions' not in data:
                 get_logger().info('No code suggestions found for PR.')
                 return
 
             if (not self.is_extended and get_settings().pr_code_suggestions.rank_suggestions) or \
-                    (self.is_extended and get_settings().pr_code_suggestions.rank_extended_suggestions):
+                        (self.is_extended and get_settings().pr_code_suggestions.rank_extended_suggestions):
                 get_logger().info('Ranking Suggestions...')
                 data['Code suggestions'] = await self.rank_suggestions(data['Code suggestions'])
 
@@ -135,7 +135,10 @@ class PRCodeSuggestions:
                 if new_code_snippet:
                     new_code_snippet = self.dedent_code(relevant_file, relevant_lines_start, new_code_snippet)
 
-                body = f"**Suggestion:** {content}\n```suggestion\n" + new_code_snippet + "\n```"
+                body = (
+                    f"**Suggestion:** {content}\n```suggestion\n{new_code_snippet}"
+                    + "\n```"
+                )
                 code_suggestions.append({'body': body, 'relevant_file': relevant_file,
                                          'relevant_lines_start': relevant_lines_start,
                                          'relevant_lines_end': relevant_lines_end})
@@ -152,13 +155,15 @@ class PRCodeSuggestions:
     def dedent_code(self, relevant_file, relevant_lines_start, new_code_snippet):
         try:  # dedent code snippet
             self.diff_files = self.git_provider.diff_files if self.git_provider.diff_files \
-                else self.git_provider.get_diff_files()
-            original_initial_line = None
-            for file in self.diff_files:
-                if file.filename.strip() == relevant_file:
-                    original_initial_line = file.head_file.splitlines()[relevant_lines_start - 1]
-                    break
-            if original_initial_line:
+                    else self.git_provider.get_diff_files()
+            if original_initial_line := next(
+                (
+                    file.head_file.splitlines()[relevant_lines_start - 1]
+                    for file in self.diff_files
+                    if file.filename.strip() == relevant_file
+                ),
+                None,
+            ):
                 suggested_initial_line = new_code_snippet.splitlines()[0]
                 original_initial_spaces = len(original_initial_line) - len(original_initial_line.lstrip())
                 suggested_initial_spaces = len(suggested_initial_line) - len(suggested_initial_line.lstrip())
@@ -207,19 +212,18 @@ class PRCodeSuggestions:
             List: The ranked list of code suggestions.
         """
 
-        suggestion_list = []
-        # remove invalid suggestions
-        for i, suggestion in enumerate(data):
-            if suggestion['existing code'] != suggestion['improved code']:
-                suggestion_list.append(suggestion)
-
+        suggestion_list = [
+            suggestion
+            for suggestion in data
+            if suggestion['existing code'] != suggestion['improved code']
+        ]
         data_sorted = [[]] * len(suggestion_list)
 
         try:
-            suggestion_str = ""
-            for i, suggestion in enumerate(suggestion_list):
-                suggestion_str += f"suggestion {i + 1}: " + str(suggestion) + '\n\n'
-
+            suggestion_str = "".join(
+                f"suggestion {i + 1}: {str(suggestion)}" + '\n\n'
+                for i, suggestion in enumerate(suggestion_list)
+            )
             variables = {'suggestion_list': suggestion_list, 'suggestion_str': suggestion_str}
             model = get_settings().config.model
             environment = Environment(undefined=StrictUndefined)

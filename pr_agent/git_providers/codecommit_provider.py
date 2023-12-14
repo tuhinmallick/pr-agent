@@ -69,15 +69,13 @@ class CodeCommitProvider(GitProvider):
         return "CodeCommit"
 
     def is_supported(self, capability: str) -> bool:
-        if capability in [
+        return capability not in {
             "get_issue_comments",
             "create_inline_comment",
             "publish_inline_comments",
             "get_labels",
-            "gfm_markdown"
-        ]:
-            return False
-        return True
+            "gfm_markdown",
+        }
 
     def set_pr(self, pr_url: str):
         self.repo_name, self.pr_num = self._parse_pr_url(pr_url)
@@ -90,12 +88,16 @@ class CodeCommitProvider(GitProvider):
 
         self.git_files = []
         differences = self.codecommit_client.get_differences(self.repo_name, self.pr.destination_commit, self.pr.source_commit)
-        for item in differences:
-            self.git_files.append(CodeCommitFile(item.before_blob_path,
-                                                 item.before_blob_id,
-                                                 item.after_blob_path,
-                                                 item.after_blob_id,
-                                                 CodeCommitProvider._get_edit_type(item.change_type)))
+        self.git_files.extend(
+            CodeCommitFile(
+                item.before_blob_path,
+                item.before_blob_id,
+                item.after_blob_path,
+                item.after_blob_id,
+                CodeCommitProvider._get_edit_type(item.change_type),
+            )
+            for item in differences
+        )
         return self.git_files
 
     def get_diff_files(self) -> list[FilePatchInfo]:
@@ -187,10 +189,13 @@ class CodeCommitProvider(GitProvider):
         counter = 1
         for suggestion in code_suggestions:
             # Verify that each suggestion has the required keys
-            if not all(key in suggestion for key in ["body", "relevant_file", "relevant_lines_start"]):
+            if any(
+                key not in suggestion
+                for key in ["body", "relevant_file", "relevant_lines_start"]
+            ):
                 get_logger().warning(f"Skipping code suggestion #{counter}: Each suggestion must have 'body', 'relevant_file', 'relevant_lines_start' keys")
                 continue
-       
+
             # Publish the code suggestion to CodeCommit
             try:
                 get_logger().debug(f"Code Suggestion #{counter} in file: {suggestion['relevant_file']}: {suggestion['relevant_lines_start']}")
@@ -205,7 +210,7 @@ class CodeCommitProvider(GitProvider):
                 )
             except Exception as e:
                 raise ValueError(f"CodeCommit Cannot publish code suggestions for PR: {self.pr_num}") from e
-            
+
             counter += 1
 
         # The calling function passes in a list of code suggestions, and this function publishes each suggestion one at a time.
@@ -245,8 +250,7 @@ class CodeCommitProvider(GitProvider):
         and is not the same as the CodeCommit PR identifier.
         """
         try:
-            pr_id = f"{self.repo_name}/{self.pr_num}"
-            return pr_id
+            return f"{self.repo_name}/{self.pr_num}"
         except:
             return ""
         
@@ -276,12 +280,10 @@ class CodeCommitProvider(GitProvider):
             for ext in extensions:
                 main_extensions_flat[ext] = language
 
-        # Map the file extension/languages to percentages
-        languages = {}
-        for ext, pct in percentages.items():
-            languages[main_extensions_flat.get(ext, "")] = pct
-
-        return languages
+        return {
+            main_extensions_flat.get(ext, ""): pct
+            for ext, pct in percentages.items()
+        }
 
     def get_pr_branch(self):
         return self.pr.source_branch
@@ -422,8 +424,7 @@ class CodeCommitProvider(GitProvider):
         comment = comment.replace("<details>", "")
         comment = comment.replace("</details>", "")
         comment = comment.replace("<summary>", "")
-        comment = comment.replace("</summary>", "")
-        return comment
+        return comment.replace("</summary>", "")
 
     @staticmethod
     def _get_edit_type(codecommit_change_type: str):
@@ -491,8 +492,7 @@ class CodeCommitProvider(GitProvider):
 
         # Identify language by file extension and count
         lang_count = Counter(extensions)
-        # Convert counts to percentages
-        lang_percentage = {
-            lang: round(count / total_files * 100) for lang, count in lang_count.items()
+        return {
+            lang: round(count / total_files * 100)
+            for lang, count in lang_count.items()
         }
-        return lang_percentage

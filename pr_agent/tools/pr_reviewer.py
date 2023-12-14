@@ -86,7 +86,7 @@ class PRReviewer:
             None
         """
         is_incremental = False
-        if args and len(args) >= 1:
+        if args:
             arg = args[0]
             if arg == "-i":
                 is_incremental = True
@@ -222,17 +222,14 @@ class PRReviewer:
 
                     # try to add line numbers link to code suggestions
                     if hasattr(self.git_provider, 'generate_link_to_relevant_line_number'):
-                        link = self.git_provider.generate_link_to_relevant_line_number(suggestion)
-                        if link:
+                        if link := self.git_provider.generate_link_to_relevant_line_number(
+                            suggestion
+                        ):
                             suggestion['relevant line'] = f"[{suggestion['relevant line']}]({link})"
-                    else:
-                        pass
-
-
         # Add incremental review section
         if self.incremental.is_incremental:
             last_commit_url = f"{self.git_provider.get_pr_url()}/commits/" \
-                              f"{self.git_provider.incremental.first_new_commit_sha}"
+                                  f"{self.git_provider.incremental.first_new_commit_sha}"
             last_commit_msg = self.incremental.commits_range[0].commit.message if self.incremental.commits_range else ""
             incremental_review_markdown_text = f"Starting from commit {last_commit_url}"
             if last_commit_msg:
@@ -266,7 +263,7 @@ class PRReviewer:
         if get_settings().config.verbosity_level >= 2:
             get_logger().info(f"Markdown response:\n{markdown_text}")
 
-        if markdown_text == None or len(markdown_text) == 0:
+        if markdown_text is None or len(markdown_text) == 0:
             markdown_text = ""
 
         return markdown_text
@@ -289,8 +286,9 @@ class PRReviewer:
                 continue
 
             if self.git_provider.is_supported("create_inline_comment"):
-                comment = self.git_provider.create_inline_comment(content, relevant_file, relevant_line_in_file)
-                if comment:
+                if comment := self.git_provider.create_inline_comment(
+                    content, relevant_file, relevant_line_in_file
+                ):
                     comments.append(comment)
             else:
                 self.git_provider.publish_inline_comment(content, relevant_file, relevant_line_in_file)
@@ -377,27 +375,30 @@ class PRReviewer:
         return True
 
     def set_review_labels(self, data):
-        if (get_settings().pr_reviewer.enable_review_labels_security or
-                get_settings().pr_reviewer.enable_review_labels_effort):
-            try:
-                review_labels = []
-                if get_settings().pr_reviewer.enable_review_labels_effort:
-                    estimated_effort = data['PR Analysis']['Estimated effort to review [1-5]']
-                    estimated_effort_number = int(estimated_effort.split(',')[0])
-                    if 1 <= estimated_effort_number <= 5: # 1, because ...
-                        review_labels.append(f'Review effort [1-5]: {estimated_effort_number}')
-                if get_settings().pr_reviewer.enable_review_labels_security:
-                    security_concerns = data['PR Analysis']['Security concerns'] # yes, because ...
-                    security_concerns_bool = 'yes' in security_concerns.lower() or 'true' in security_concerns.lower()
-                    if security_concerns_bool:
-                        review_labels.append('Possible security concern')
+        if (
+            not get_settings().pr_reviewer.enable_review_labels_security
+            and not get_settings().pr_reviewer.enable_review_labels_effort
+        ):
+            return
+        try:
+            review_labels = []
+            if get_settings().pr_reviewer.enable_review_labels_effort:
+                estimated_effort = data['PR Analysis']['Estimated effort to review [1-5]']
+                estimated_effort_number = int(estimated_effort.split(',')[0])
+                if 1 <= estimated_effort_number <= 5: # 1, because ...
+                    review_labels.append(f'Review effort [1-5]: {estimated_effort_number}')
+            if get_settings().pr_reviewer.enable_review_labels_security:
+                security_concerns = data['PR Analysis']['Security concerns'] # yes, because ...
+                security_concerns_bool = 'yes' in security_concerns.lower() or 'true' in security_concerns.lower()
+                if security_concerns_bool:
+                    review_labels.append('Possible security concern')
 
-                current_labels = self.git_provider.get_pr_labels()
-                current_labels_filtered = [label for label in current_labels if
-                                           not label.lower().startswith('review effort [1-5]:') and not label.lower().startswith(
-                                               'possible security concern')]
-                if current_labels or review_labels:
-                    get_logger().info(f"Setting review labels: {review_labels + current_labels_filtered}")
-                    self.git_provider.publish_labels(review_labels + current_labels_filtered)
-            except Exception as e:
-                get_logger().error(f"Failed to set review labels, error: {e}")
+            current_labels = self.git_provider.get_pr_labels()
+            current_labels_filtered = [label for label in current_labels if
+                                       not label.lower().startswith('review effort [1-5]:') and not label.lower().startswith(
+                                           'possible security concern')]
+            if current_labels or review_labels:
+                get_logger().info(f"Setting review labels: {review_labels + current_labels_filtered}")
+                self.git_provider.publish_labels(review_labels + current_labels_filtered)
+        except Exception as e:
+            get_logger().error(f"Failed to set review labels, error: {e}")

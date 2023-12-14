@@ -44,9 +44,11 @@ class GitLabProvider(GitProvider):
         self.incremental = incremental
 
     def is_supported(self, capability: str) -> bool:
-        if capability in ['get_issue_comments', 'create_inline_comment', 'publish_inline_comments']: # gfm_markdown is supported in gitlab !
-            return False
-        return True
+        return capability not in {
+            'get_issue_comments',
+            'create_inline_comment',
+            'publish_inline_comments',
+        }
 
     @property
     def pr(self):
@@ -169,12 +171,11 @@ class GitLabProvider(GitProvider):
                     return
         except Exception as e:
             get_logger().exception(f"Failed to update persistent review, error: {e}")
-            pass
         self.publish_comment(pr_comment)
 
     def publish_comment(self, mr_comment: str, is_temporary: bool = False):
-        comment = self.mr.notes.create({'body': mr_comment})
         if is_temporary:
+            comment = self.mr.notes.create({'body': mr_comment})
             self.temp_comments.append(comment)
 
     def publish_inline_comment(self, body: str, relevant_file: str, relevant_line_in_file: str):
@@ -243,12 +244,14 @@ class GitLabProvider(GitProvider):
                 relevant_lines_end = suggestion['relevant_lines_end']
 
                 diff_files = self.get_diff_files()
-                target_file = None
-                for file in diff_files:
-                    if file.filename == relevant_file:
-                        if file.filename == relevant_file:
-                            target_file = file
-                            break
+                target_file = next(
+                    (
+                        file
+                        for file in diff_files
+                        if file.filename == relevant_file
+                    ),
+                    None,
+                )
                 range = relevant_lines_end - relevant_lines_start # no need to add 1
                 body = body.replace('```suggestion', f'```suggestion:-0+{range}')
                 lines = target_file.head_file.splitlines()
@@ -355,8 +358,11 @@ class GitLabProvider(GitProvider):
 
     def get_repo_settings(self):
         try:
-            contents = self.gl.projects.get(self.id_project).files.get(file_path='.pr_agent.toml', ref=self.mr.target_branch).decode()
-            return contents
+            return (
+                self.gl.projects.get(self.id_project)
+                .files.get(file_path='.pr_agent.toml', ref=self.mr.target_branch)
+                .decode()
+            )
         except Exception:
             return ""
 
@@ -385,15 +391,12 @@ class GitLabProvider(GitProvider):
 
         # Handle special delimiter (-)
         project_path = "/".join(path_parts[:mr_index])
-        if project_path.endswith('/-'):
-            project_path = project_path[:-2]
-
+        project_path = project_path.removesuffix('/-')
         # Return the path before 'merge_requests' and the ID
         return project_path, mr_id
 
     def _get_merge_request(self):
-        mr = self.gl.projects.get(self.id_project).mergerequests.get(self.id_mr)
-        return mr
+        return self.gl.projects.get(self.id_project).mergerequests.get(self.id_mr)
 
     def get_user_id(self):
         return None
@@ -433,19 +436,17 @@ class GitLabProvider(GitProvider):
 
     def get_pr_id(self):
         try:
-            pr_id = self.mr.web_url
-            return pr_id
+            return self.mr.web_url
         except:
             return ""
 
     def get_line_link(self, relevant_file: str, relevant_line_start: int, relevant_line_end: int = None) -> str:
         if relevant_line_start == -1:
-            link = f"https://gitlab.com/codiumai/pr-agent/-/blob/{self.mr.source_branch}/{relevant_file}?ref_type=heads"
+            return f"https://gitlab.com/codiumai/pr-agent/-/blob/{self.mr.source_branch}/{relevant_file}?ref_type=heads"
         elif relevant_line_end:
-            link = f"https://gitlab.com/codiumai/pr-agent/-/blob/{self.mr.source_branch}/{relevant_file}?ref_type=heads#L{relevant_line_start}-L{relevant_line_end}"
+            return f"https://gitlab.com/codiumai/pr-agent/-/blob/{self.mr.source_branch}/{relevant_file}?ref_type=heads#L{relevant_line_start}-L{relevant_line_end}"
         else:
-            link = f"https://gitlab.com/codiumai/pr-agent/-/blob/{self.mr.source_branch}/{relevant_file}?ref_type=heads#L{relevant_line_start}"
-        return link
+            return f"https://gitlab.com/codiumai/pr-agent/-/blob/{self.mr.source_branch}/{relevant_file}?ref_type=heads#L{relevant_line_start}"
 
 
     def generate_link_to_relevant_line_number(self, suggestion) -> str:
@@ -456,16 +457,10 @@ class GitLabProvider(GitProvider):
                 return ""
 
             position, absolute_position = find_line_number_of_relevant_line_in_file \
-                (self.diff_files, relevant_file, relevant_line_str)
+                    (self.diff_files, relevant_file, relevant_line_str)
 
             if absolute_position != -1:
-                # link to right file only
-                link = f"https://gitlab.com/codiumai/pr-agent/-/blob/{self.mr.source_branch}/{relevant_file}?ref_type=heads#L{absolute_position}"
-
-                # # link to diff
-                # sha_file = hashlib.sha1(relevant_file.encode('utf-8')).hexdigest()
-                # link = f"{self.pr.web_url}/diffs#{sha_file}_{absolute_position}_{absolute_position}"
-                return link
+                return f"https://gitlab.com/codiumai/pr-agent/-/blob/{self.mr.source_branch}/{relevant_file}?ref_type=heads#L{absolute_position}"
         except Exception as e:
             if get_settings().config.verbosity_level >= 2:
                 get_logger().info(f"Failed adding line link, error: {e}")

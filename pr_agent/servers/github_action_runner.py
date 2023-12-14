@@ -16,9 +16,7 @@ from pr_agent.tools.pr_reviewer import PRReviewer
 def is_true(value: Union[str, bool]) -> bool:
     if isinstance(value, bool):
         return value
-    if isinstance(value, str):
-        return value.lower() == 'true'
-    return False
+    return value.lower() == 'true' if isinstance(value, str) else False
 
 
 def get_setting_or_env(key: str, default: Union[str, bool] = None) -> Union[str, bool]:
@@ -80,8 +78,7 @@ async def run_action():
     if GITHUB_EVENT_NAME == "pull_request":
         action = event_payload.get("action")
         if action in ["opened", "reopened"]:
-            pr_url = event_payload.get("pull_request", {}).get("url")
-            if pr_url:
+            if pr_url := event_payload.get("pull_request", {}).get("url"):
                 auto_review = get_setting_or_env("GITHUB_ACTION.AUTO_REVIEW", None)
                 if auto_review is None or is_true(auto_review):
                     await PRReviewer(pr_url).run()
@@ -92,12 +89,10 @@ async def run_action():
                 if is_true(auto_improve):
                     await PRCodeSuggestions(pr_url).run()
 
-    # Handle issue comment event
     elif GITHUB_EVENT_NAME == "issue_comment":
         action = event_payload.get("action")
         if action in ["created", "edited"]:
-            comment_body = event_payload.get("comment", {}).get("body")
-            if comment_body:
+            if comment_body := event_payload.get("comment", {}).get("body"):
                 is_pr = False
                 # check if issue is pull request
                 if event_payload.get("issue", {}).get("pull_request"):
